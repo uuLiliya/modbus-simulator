@@ -27,3 +27,6 @@ client
 # System files
 .env
 .env.local
+
+# Log files
+*.log
