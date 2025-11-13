@@ -31,6 +31,39 @@ A high-performance multi-client TCP server and client implementation in C for Ub
 - POSIX-compliant C library
 - Linux kernel support for epoll (all modern Linux systems)
 
+## Project Structure
+
+The project follows a standard directory layout:
+
+```
+.
+├── src/                         # Source code files
+│   ├── server.c                 # Multi-client TCP server implementation
+│   ├── client.c                 # TCP client implementation
+│   ├── modbus.c                 # Modbus protocol implementation
+│   └── history.c                # Command history management
+├── include/                     # Header files
+│   ├── common.h                 # Shared constants and structures
+│   └── modbus.h                 # Modbus protocol definitions
+├── build/                       # Compiled binaries (generated)
+│   ├── server                   # Server executable
+│   └── client                   # Client executable
+├── doc/                         # Documentation
+│   ├── README.md                # Main documentation (this file)
+│   ├── MODBUS_README.md         # Modbus TCP detailed guide
+│   ├── HISTORY_README.md        # Command history features
+│   ├── TESTING.md               # Testing documentation
+│   ├── IMPLEMENTATION_SUMMARY.md # Implementation details
+│   └── GIT_GUIDE.md             # Git workflow reference
+├── tests/                       # Test scripts
+│   ├── test_modbus_interactive.sh
+│   ├── test_history.sh
+│   ├── test_history_auto.sh
+│   └── verify_compilation.sh
+├── Makefile                     # Build configuration
+└── .gitignore                   # Git ignore rules
+```
+
 ## Building
 
 ### Compile all programs:
@@ -38,11 +71,7 @@ A high-performance multi-client TCP server and client implementation in C for Ub
 make
 ```
 
-### Compile individual programs:
-```bash
-make server      # Compile server only
-make client      # Compile client only
-```
+This will create the executables in the `build/` directory.
 
 ### Clean up compiled files:
 ```bash
@@ -53,12 +82,12 @@ make clean
 
 ### Start the server:
 ```bash
-./server <port>
+./build/server <port>
 ```
 
 Example:
 ```bash
-./server 8888
+./build/server 8888
 ```
 
 The server will display messages similar to:
@@ -71,39 +100,39 @@ The server will display messages similar to:
 
 ### Connect a client:
 ```bash
-./client <server_ip> <server_port>
+./build/client <server_ip> <server_port>
 ```
 
 Example (localhost):
 ```bash
-./client 127.0.0.1 8888
+./build/client 127.0.0.1 8888
 ```
 
 Example (remote server):
 ```bash
-./client 192.168.1.100 8888
+./build/client 192.168.1.100 8888
 ```
 
 ### Testing with multiple clients:
 
 Terminal 1 - Start server:
 ```bash
-./server 8888
+./build/server 8888
 ```
 
 Terminal 2 - First client:
 ```bash
-./client 127.0.0.1 8888
+./build/client 127.0.0.1 8888
 ```
 
 Terminal 3 - Second client:
 ```bash
-./client 127.0.0.1 8888
+./build/client 127.0.0.1 8888
 ```
 
 Terminal 4 - Add more clients as needed:
 ```bash
-./client 127.0.0.1 8888
+./build/client 127.0.0.1 8888
 ```
 
 ### Server Commands:
@@ -262,12 +291,12 @@ Solution: Increase system file descriptor limit with `ulimit -n`.
 
 Start server:
 ```bash
-./server 502    # Standard Modbus TCP port
+./build/server 502    # Standard Modbus TCP port
 ```
 
 Connect client and send Modbus commands:
 ```bash
-./client 127.0.0.1 502
+./build/client 127.0.0.1 502
 modbus read 100 5        # Read 5 registers starting from address 100
 modbus write 100 9999    # Write value 9999 to register at address 100
 quit
@@ -276,7 +305,7 @@ quit
 ### Run Tests
 
 ```bash
-./test_modbus_interactive.sh
+./tests/test_modbus_interactive.sh
 ```
 
 For detailed Modbus TCP documentation, see **[MODBUS_README.md](MODBUS_README.md)**.
@@ -285,29 +314,8 @@ For detailed Modbus TCP documentation, see **[MODBUS_README.md](MODBUS_README.md
 
 - **[Modbus TCP Documentation](MODBUS_README.md)** - Complete Modbus TCP protocol implementation guide
 - **[Command History Documentation](HISTORY_README.md)** - Detailed guide for command history navigation features
-- **[Git Command Guide](docs/GIT_GUIDE.md)** - Comprehensive Git commands reference including basic setup, branching, merging, and common workflows
-
-## File Structure
-
-```
-.
-├── common.h                     # Shared constants and includes
-├── modbus.h                     # Modbus protocol definitions
-├── modbus.c                     # Modbus protocol implementation
-├── history.c                    # Command history management implementation
-├── server.c                     # Multi-client TCP server with Modbus support
-├── client.c                     # TCP client with Modbus command support
-├── Makefile                     # Build configuration
-├── README.md                    # This file
-├── MODBUS_README.md             # Modbus TCP detailed documentation
-├── HISTORY_README.md            # Command history navigation documentation
-├── test_modbus_interactive.sh   # Modbus functionality test script
-├── test_history.sh              # Command history manual test guide
-├── test_history_auto.sh         # Command history automated test
-├── verify_compilation.sh        # Verify history feature compilation
-└── docs/
-    └── GIT_GUIDE.md             # Git commands and workflows reference
-```
+- **[Testing Guide](TESTING.md)** - Comprehensive testing documentation
+- **[Git Command Guide](GIT_GUIDE.md)** - Comprehensive Git commands reference including basic setup, branching, merging, and common workflows
 
 ## License
 

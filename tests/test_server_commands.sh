@@ -20,18 +20,18 @@ trap cleanup EXIT
 mkfifo $SERVER_FIFO
 
 echo "启动服务器..."
-./server $PORT < $SERVER_FIFO > $SERVER_LOG 2>&1 &
+./build/server $PORT < $SERVER_FIFO > $SERVER_LOG 2>&1 &
 SERVER_PID=$!
 exec 3>$SERVER_FIFO  # 保持管道打开
 sleep 1
 
 echo "启动客户端1（长连接）..."
-(sleep 100) | ./client 127.0.0.1 $PORT > $CLIENT1_LOG 2>&1 &
+(sleep 100) | ./build/client 127.0.0.1 $PORT > $CLIENT1_LOG 2>&1 &
 CLIENT1_PID=$!
 sleep 1
 
 echo "启动客户端2（长连接）..."
-(sleep 100) | ./client 127.0.0.1 $PORT > $CLIENT2_LOG 2>&1 &
+(sleep 100) | ./build/client 127.0.0.1 $PORT > $CLIENT2_LOG 2>&1 &
 CLIENT2_PID=$!
 sleep 1
 

@@ -26,7 +26,7 @@ make all
 
 **启动服务器：**
 ```bash
-./server 8080
+./build/server 8080
 ```
 
 **预期输出：**
@@ -37,7 +37,7 @@ make all
 
 **连接客户端：**
 ```bash
-./client 127.0.0.1 8080
+./build/client 127.0.0.1 8080
 ```
 
 **服务器应显示：**
@@ -142,13 +142,13 @@ broadcast Hello Everyone
 
 ```bash
 # 基本功能测试
-bash test_fd.sh
+bash tests/test_fd.sh
 
 # 多客户端测试
-bash test_multi_clients.sh
+bash tests/test_multi_clients.sh
 
 # 服务器命令测试
-bash test_server_commands2.sh
+bash tests/test_server_commands2.sh
 ```
 
 所有测试应该通过。

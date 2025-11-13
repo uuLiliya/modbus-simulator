@@ -5,17 +5,17 @@
 PORT=15558
 
 echo "启动服务器..."
-./server $PORT > /tmp/server_test.log 2>&1 &
+./build/server $PORT > /tmp/server_test.log 2>&1 &
 SERVER_PID=$!
 sleep 1
 
 echo "启动客户端1..."
-(sleep 5) | ./client 127.0.0.1 $PORT > /tmp/client1_test.log 2>&1 &
+(sleep 5) | ./build/client 127.0.0.1 $PORT > /tmp/client1_test.log 2>&1 &
 CLIENT1_PID=$!
 sleep 1
 
 echo "启动客户端2..."
-(sleep 5) | ./client 127.0.0.1 $PORT > /tmp/client2_test.log 2>&1 &
+(sleep 5) | ./build/client 127.0.0.1 $PORT > /tmp/client2_test.log 2>&1 &
 CLIENT2_PID=$!
 sleep 2
 

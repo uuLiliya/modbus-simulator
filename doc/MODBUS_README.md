@@ -98,20 +98,20 @@ make
 ### 启动服务器
 
 ```bash
-./server <端口号>
+./build/server <端口号>
 ```
 
 例如：
 ```bash
-./server 502    # Modbus TCP 标准端口
-./server 10502  # 自定义端口
+./build/server 502    # Modbus TCP 标准端口
+./build/server 10502  # 自定义端口
 ```
 
 ### 客户端命令
 
 启动客户端：
 ```bash
-./client <服务器IP> <端口号>
+./build/client <服务器IP> <端口号>
 ```
 
 #### Modbus 命令
@@ -153,7 +153,7 @@ make
 
 运行自动测试脚本：
 ```bash
-./test_modbus_interactive.sh
+./tests/test_modbus_interactive.sh
 ```
 
 该脚本会自动测试：
@@ -166,12 +166,12 @@ make
 
 启动服务器：
 ```bash
-./server 10502 &
+./build/server 10502 &
 ```
 
 测试FC03读取：
 ```bash
-(sleep 0.5; echo "modbus read 100 5"; sleep 2; echo "quit") | ./client 127.0.0.1 10502
+(sleep 0.5; echo "modbus read 100 5"; sleep 2; echo "quit") | ./build/client 127.0.0.1 10502
 ```
 
 预期输出：
@@ -187,7 +187,7 @@ make
 
 测试FC06写入：
 ```bash
-(sleep 0.5; echo "modbus write 100 9999"; sleep 2; echo "quit") | ./client 127.0.0.1 10502
+(sleep 0.5; echo "modbus write 100 9999"; sleep 2; echo "quit") | ./build/client 127.0.0.1 10502
 ```
 
 预期输出：
@@ -198,7 +198,7 @@ make
 
 验证写入：
 ```bash
-(sleep 0.5; echo "modbus read 100 1"; sleep 2; echo "quit") | ./client 127.0.0.1 10502
+(sleep 0.5; echo "modbus read 100 1"; sleep 2; echo "quit") | ./build/client 127.0.0.1 10502
 ```
 
 预期输出：
@@ -211,11 +211,11 @@ make
 
 ### 文件列表
 
-- `modbus.h` - Modbus协议常量、结构体和函数接口定义
-- `modbus.c` - Modbus协议编码/解码实现
-- `server.c` - TCP服务器，支持Modbus请求处理
-- `client.c` - TCP客户端，支持发送Modbus请求
-- `common.h` - 公共头文件
+- `include/modbus.h` - Modbus协议常量、结构体和函数接口定义
+- `src/modbus.c` - Modbus协议编码/解码实现
+- `src/server.c` - TCP服务器，支持Modbus请求处理
+- `src/client.c` - TCP客户端，支持发送Modbus请求
+- `include/common.h` - 公共头文件
 - `Makefile` - 编译配置
 
 ### 主要数据结构
