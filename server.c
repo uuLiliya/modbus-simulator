@@ -4,7 +4,7 @@
  * 功能描述：
  * - 基于 epoll 的高性能多客户端并发服务器
  * - 支持最多 128 个客户端同时连接
- * - 每个客户端分配唯一ID（Client_1, Client_2 等）
+ * - 每个客户端使用 socket 文件描述符作为唯一标识
  * - 服务器可向指定客户端发送消息或广播消息
  * - 实现回显（Echo）协议，将客户端发来的消息前添加 "Echo: " 前缀后返回
  * - 使用非阻塞套接字和事件驱动模型提高吞吐量
@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <limits.h>
 
 /* epoll 每次可以处理的最大事件数 */
 #define MAX_EVENTS 128
@@ -25,9 +26,8 @@
 static int server_fd = -1;
 static int epoll_fd = -1;
 
-/* 全局变量：客户端信息数组和下一个客户端ID计数器 */
+/* 全局变量：客户端信息数组和客户端计数器 */
 static ClientInfo clients[MAX_CLIENTS];
-static int next_client_id = 1;
 static int client_count = 0;
 
 /*
@@ -58,22 +58,6 @@ static ClientInfo* find_client_by_fd(int fd) {
 }
 
 /*
- * 根据客户端ID查找客户端信息
- * 参数：
- *   id - 客户端ID字符串
- * 返回：
- *   指向客户端信息的指针，未找到返回NULL
- */
-static ClientInfo* find_client_by_id(const char *id) {
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (clients[i].active && strcmp(clients[i].id, id) == 0) {
-            return &clients[i];
-        }
-    }
-    return NULL;
-}
-
-/*
  * 添加新客户端到客户端数组
  * 参数：
  *   fd - 客户端文件描述符
@@ -87,7 +71,7 @@ static ClientInfo* add_client(int fd, struct sockaddr_in addr) {
             clients[i].fd = fd;
             clients[i].addr = addr;
             clients[i].active = true;
-            snprintf(clients[i].id, CLIENT_ID_LENGTH, "Client_%d", next_client_id++);
+            snprintf(clients[i].id, CLIENT_ID_LENGTH, "%d", fd);
             client_count++;
             return &clients[i];
         }
@@ -107,6 +91,7 @@ static void deactivate_client(ClientInfo *client) {
     client->active = false;
     client->fd = -1;
     memset(&client->addr, 0, sizeof(client->addr));
+    memset(client->id, 0, CLIENT_ID_LENGTH);
     if (client_count > 0) {
         client_count--;
     }
@@ -123,6 +108,7 @@ static void disconnect_client(ClientInfo *client, const char *reason) {
         return;
     }
 
+    int fd = client->fd;
     char addr_buf[INET_ADDRSTRLEN] = {0};
     if (inet_ntop(AF_INET, &client->addr.sin_addr, addr_buf, sizeof(addr_buf)) == NULL) {
         strncpy(addr_buf, "未知", sizeof(addr_buf) - 1);
@@ -136,8 +122,8 @@ static void disconnect_client(ClientInfo *client, const char *reason) {
 
     deactivate_client(client);
 
-    printf("[服务器] %s 已断开连接（地址 %s:%d，原因: %s）（当前客户端总数: %d）\n",
-           client->id,
+    printf("[服务器] [fd:%d] 已断开连接（地址 %s:%d，原因: %s）（当前客户端总数: %d）\n",
+           fd,
            addr_buf,
            port,
            reason ? reason : "未知",
@@ -151,8 +137,7 @@ static void list_clients() {
     printf("[服务器] 当前连接的客户端列表：\n");
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].active) {
-            printf("  - %s (fd=%d, 地址=%s:%d)\n",
-                   clients[i].id,
+            printf("  - [fd:%d] (地址=%s:%d)\n",
                    clients[i].fd,
                    inet_ntoa(clients[i].addr.sin_addr),
                    ntohs(clients[i].addr.sin_port));
@@ -164,20 +149,20 @@ static void list_clients() {
 /*
  * 向指定客户端发送消息
  * 参数：
- *   client_id - 客户端ID
+ *   target_fd - 客户端的 socket 文件描述符
  *   message - 要发送的消息
  * 返回：
  *   成功返回true，失败返回false
  */
-static bool send_to_client(const char *client_id, const char *message) {
-    ClientInfo *client = find_client_by_id(client_id);
+static bool send_to_client(int target_fd, const char *message) {
+    ClientInfo *client = find_client_by_fd(target_fd);
     if (!client) {
-        printf("[服务器] 错误：未找到客户端 %s\n", client_id);
+        printf("[服务器] 错误：未找到文件描述符为 %d 的客户端\n", target_fd);
         return false;
     }
 
     if (!client->active) {
-        printf("[服务器] 警告：客户端 %s 已不在活跃状态\n", client_id);
+        printf("[服务器] 警告：文件描述符为 %d 的客户端已不在活跃状态\n", target_fd);
         return false;
     }
 
@@ -238,7 +223,7 @@ static void trim_newline(char *str) {
  * 处理服务器命令行输入
  * 支持的命令：
  *   list - 列出所有客户端
- *   send <client_id> <message> - 向指定客户端发送消息
+ *   send <fd> <message> - 向指定文件描述符的客户端发送消息
  *   broadcast <message> - 向所有客户端广播消息
  *   help - 显示帮助信息
  */
@@ -261,25 +246,38 @@ static void handle_stdin_input() {
         list_clients();
     } else if (strcmp(input, "help") == 0) {
         printf("\n[服务器] 可用命令：\n");
-        printf("  list                          - 列出所有连接的客户端\n");
-        printf("  send <client_id> <message>    - 向指定客户端发送消息\n");
-        printf("  broadcast <message>           - 向所有客户端广播消息\n");
-        printf("  help                          - 显示此帮助信息\n\n");
+        printf("  list                        - 列出所有连接的客户端\n");
+        printf("  send <fd> <message>         - 向指定文件描述符的客户端发送消息\n");
+        printf("  broadcast <message>         - 向所有客户端广播消息\n");
+        printf("  help                        - 显示此帮助信息\n\n");
     } else if (strncmp(input, "send ", 5) == 0) {
         char *args = input + 5;
         char *space = strchr(args, ' ');
         if (space == NULL) {
-            printf("[服务器] 错误：用法: send <client_id> <message>\n");
+            printf("[服务器] 错误：用法: send <fd> <message>\n");
             return;
         }
         *space = '\0';
-        char *client_id = args;
+        char *fd_str = args;
         char *message = space + 1;
-        
+
         if (strlen(message) == 0) {
             printf("[服务器] 错误：消息不能为空\n");
             return;
         }
+
+        char *endptr = NULL;
+        errno = 0;
+        long target_fd_long = strtol(fd_str, &endptr, 10);
+        if (fd_str[0] == '\0' || endptr == NULL || *endptr != '\0' || errno != 0) {
+            printf("[服务器] 错误：无效的文件描述符 %s\n", fd_str);
+            return;
+        }
+        if (target_fd_long < 0 || target_fd_long > INT_MAX) {
+            printf("[服务器] 错误：文件描述符超出范围\n");
+            return;
+        }
+        int target_fd = (int)target_fd_long;
 
         char full_message[BUFFER_SIZE];
         size_t prefix_len = strlen("[服务器] ");
@@ -289,9 +287,9 @@ static void handle_stdin_input() {
             actual_len = max_copy;
         }
         snprintf(full_message, BUFFER_SIZE, "[服务器] %.*s\n", (int)actual_len, message);
-        
-        if (send_to_client(client_id, full_message)) {
-            printf("[服务器] 已向 %s 发送消息: %.*s\n", client_id, (int)actual_len, message);
+
+        if (send_to_client(target_fd, full_message)) {
+            printf("[服务器] 已向 [fd:%d] 发送消息: %.*s\n", target_fd, (int)actual_len, message);
         }
     } else if (strncmp(input, "broadcast ", 10) == 0) {
         char *message = input + 10;
@@ -509,15 +507,15 @@ int main(int argc, char *argv[]) {
                     if (inet_ntop(AF_INET, &client_addr.sin_addr, addr_buf, sizeof(addr_buf)) == NULL) {
                         strncpy(addr_buf, "未知", sizeof(addr_buf) - 1);
                     }
-                    printf("[服务器] %s 已连接，来自 %s:%d（当前客户端总数: %d）\n",
-                           client->id,
+                    printf("[服务器] [fd:%d] 客户端已连接，来自 %s:%d（当前客户端总数: %d）\n",
+                           client->fd,
                            addr_buf,
                            ntohs(client_addr.sin_port),
                            client_count);
 
                     /* 发送欢迎消息 */
                     char welcome[BUFFER_SIZE];
-                    snprintf(welcome, BUFFER_SIZE, "[服务器通知] 欢迎，您的编号为 %s。\n", client->id);
+                    snprintf(welcome, BUFFER_SIZE, "[服务器通知] 欢迎，您的文件描述符为 %d。\n", client->fd);
                     if (write(client_fd, welcome, strlen(welcome)) < 0) {
                         perror("write");
                         disconnect_client(client, "发送欢迎消息失败");
@@ -564,10 +562,10 @@ int main(int argc, char *argv[]) {
                 trim_newline(message);
 
                 const char *log_message = strlen(message) > 0 ? message : "(空消息)";
-                printf("[服务器] %s 发送：%s\n", client->id, log_message);
+                printf("[服务器] [fd:%d] 消息：%s\n", client->fd, log_message);
 
                 char response[BUFFER_SIZE];
-                int resp_len = snprintf(response, BUFFER_SIZE, "[服务器回显][%s] %s\n", client->id, message);
+                int resp_len = snprintf(response, BUFFER_SIZE, "[服务器回显][fd:%d] %s\n", client->fd, message);
                 if (resp_len < 0) {
                     continue;
                 }
