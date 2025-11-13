@@ -99,7 +99,7 @@ typedef struct {
 ### 启动服务器
 
 ```bash
-./server 8888
+./build/server 8888
 ```
 
 服务器启动后，你会看到：
@@ -111,7 +111,7 @@ typedef struct {
 ### 启动客户端
 
 ```bash
-./client 127.0.0.1 8888
+./build/client 127.0.0.1 8888
 ```
 
 客户端连接后，你会看到：
@@ -155,12 +155,12 @@ typedef struct {
 ## 代码文件
 
 ### 新增文件
-- `history.c` - 历史记录管理和交互式输入实现
+- `src/history.c` - 历史记录管理和交互式输入实现
 
 ### 修改文件
-- `common.h` - 添加历史相关的结构体和函数声明
-- `client.c` - 集成历史导航功能
-- `server.c` - 集成历史导航功能
+- `include/common.h` - 添加历史相关的结构体和函数声明
+- `src/client.c` - 集成历史导航功能
+- `src/server.c` - 集成历史导航功能
 - `Makefile` - 添加history.c的编译
 
 ## 技术细节
@@ -206,7 +206,7 @@ head指向最新命令的位置
 
 运行验证脚本：
 ```bash
-./verify_compilation.sh
+./tests/verify_compilation.sh
 ```
 
 该脚本会检查：

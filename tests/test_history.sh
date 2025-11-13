@@ -24,7 +24,7 @@ echo "================================"
 # 启动服务器
 echo ""
 echo "1. 启动服务器（端口 $PORT）..."
-./server $PORT > server_test.log 2>&1 &
+./build/server $PORT > server_test.log 2>&1 &
 SERVER_PID=$!
 sleep 1
 
@@ -45,7 +45,7 @@ echo "手动测试步骤："
 echo "================================"
 echo ""
 echo "请打开新的终端窗口，运行："
-echo "   ./client 127.0.0.1 $PORT"
+echo "   ./build/client 127.0.0.1 $PORT"
 echo ""
 echo "然后测试以下功能："
 echo ""

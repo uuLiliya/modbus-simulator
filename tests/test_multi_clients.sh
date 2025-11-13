@@ -6,22 +6,22 @@ PORT=15556
 SERVER_LOG=test_multi_server.log
 
 echo "启动服务器..."
-./server $PORT > $SERVER_LOG 2>&1 &
+./build/server $PORT > $SERVER_LOG 2>&1 &
 SERVER_PID=$!
 sleep 1
 
 echo "同时连接3个客户端..."
 
 # 客户端1
-(sleep 1; echo "Message from C1"; sleep 2; echo "quit") | ./client 127.0.0.1 $PORT > /dev/null 2>&1 &
+(sleep 1; echo "Message from C1"; sleep 2; echo "quit") | ./build/client 127.0.0.1 $PORT > /dev/null 2>&1 &
 C1_PID=$!
 
 # 客户端2
-(sleep 1.2; echo "Message from C2"; sleep 2; echo "quit") | ./client 127.0.0.1 $PORT > /dev/null 2>&1 &
+(sleep 1.2; echo "Message from C2"; sleep 2; echo "quit") | ./build/client 127.0.0.1 $PORT > /dev/null 2>&1 &
 C2_PID=$!
 
 # 客户端3
-(sleep 1.4; echo "Message from C3"; sleep 2; echo "quit") | ./client 127.0.0.1 $PORT > /dev/null 2>&1 &
+(sleep 1.4; echo "Message from C3"; sleep 2; echo "quit") | ./build/client 127.0.0.1 $PORT > /dev/null 2>&1 &
 C3_PID=$!
 
 # 等待所有客户端完成

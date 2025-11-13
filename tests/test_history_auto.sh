@@ -28,7 +28,7 @@ echo "================================"
 # 启动服务器
 echo ""
 echo "1. 启动服务器（端口 $PORT）..."
-./server $PORT > /tmp/server_output.txt 2>&1 &
+./build/server $PORT > /tmp/server_output.txt 2>&1 &
 SERVER_PID=$!
 sleep 1
 
@@ -54,7 +54,7 @@ quit
 EOF
 
 # 启动客户端（使用输入重定向）
-timeout 5 ./client 127.0.0.1 $PORT < /tmp/client_input.txt > /tmp/client_output.txt 2>&1 || true
+timeout 5 ./build/client 127.0.0.1 $PORT < /tmp/client_input.txt > /tmp/client_output.txt 2>&1 || true
 
 echo "   ✓ 客户端已完成测试"
 
@@ -101,35 +101,35 @@ fi
 # 检查编译是否包含历史模块
 echo ""
 echo "4. 验证历史功能编译..."
-if nm ./client | grep -q "init_history"; then
+if nm ./build/client | grep -q "init_history"; then
     echo "   ✓ 客户端包含历史初始化函数"
 else
     echo "   ✗ 客户端缺少历史函数"
     exit 1
 fi
 
-if nm ./client | grep -q "add_to_history"; then
+if nm ./build/client | grep -q "add_to_history"; then
     echo "   ✓ 客户端包含历史添加函数"
 else
     echo "   ✗ 客户端缺少历史添加函数"
     exit 1
 fi
 
-if nm ./client | grep -q "get_previous_command"; then
+if nm ./build/client | grep -q "get_previous_command"; then
     echo "   ✓ 客户端包含历史导航函数"
 else
     echo "   ✗ 客户端缺少历史导航函数"
     exit 1
 fi
 
-if nm ./server | grep -q "init_history"; then
+if nm ./build/server | grep -q "init_history"; then
     echo "   ✓ 服务器包含历史初始化函数"
 else
     echo "   ✗ 服务器缺少历史函数"
     exit 1
 fi
 
-if nm ./server | grep -q "process_server_input_char"; then
+if nm ./build/server | grep -q "process_server_input_char"; then
     echo "   ✓ 服务器包含非阻塞输入处理函数"
 else
     echo "   ✗ 服务器缺少输入处理函数"

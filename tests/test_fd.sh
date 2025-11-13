@@ -8,17 +8,17 @@ CLIENT1_LOG=test_client1.log
 CLIENT2_LOG=test_client2.log
 
 echo "启动服务器..."
-./server $PORT > $SERVER_LOG 2>&1 &
+./build/server $PORT > $SERVER_LOG 2>&1 &
 SERVER_PID=$!
 sleep 1
 
 echo "连接客户端1..."
-(sleep 0.5; echo "Hello from client 1"; sleep 0.5; echo "quit") | ./client 127.0.0.1 $PORT > $CLIENT1_LOG 2>&1 &
+(sleep 0.5; echo "Hello from client 1"; sleep 0.5; echo "quit") | ./build/client 127.0.0.1 $PORT > $CLIENT1_LOG 2>&1 &
 CLIENT1_PID=$!
 sleep 1
 
 echo "连接客户端2..."
-(sleep 0.5; echo "Hello from client 2"; sleep 0.5; echo "quit") | ./client 127.0.0.1 $PORT > $CLIENT2_LOG 2>&1 &
+(sleep 0.5; echo "Hello from client 2"; sleep 0.5; echo "quit") | ./build/client 127.0.0.1 $PORT > $CLIENT2_LOG 2>&1 &
 CLIENT2_PID=$!
 sleep 2
 

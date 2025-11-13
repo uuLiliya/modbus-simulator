@@ -8,7 +8,7 @@ echo "================================"
 echo ""
 
 # 检查可执行文件是否存在
-if [ ! -f ./server ] || [ ! -f ./client ]; then
+if [ ! -f ./build/server ] || [ ! -f ./build/client ]; then
     echo "错误：可执行文件不存在，请先编译"
     exit 1
 fi
@@ -30,7 +30,7 @@ FUNCTIONS=(
 
 MISSING=0
 for func in "${FUNCTIONS[@]}"; do
-    if nm ./client 2>/dev/null | grep -q "$func"; then
+    if nm ./build/client 2>/dev/null | grep -q "$func"; then
         echo "   ✓ $func"
     else
         echo "   ✗ $func (缺失)"
@@ -53,7 +53,7 @@ SERVER_FUNCTIONS=(
 )
 
 for func in "${SERVER_FUNCTIONS[@]}"; do
-    if nm ./server 2>/dev/null | grep -q "$func"; then
+    if nm ./build/server 2>/dev/null | grep -q "$func"; then
         echo "   ✓ $func"
     else
         echo "   ✗ $func (缺失)"
@@ -66,28 +66,28 @@ echo "3. 检查源代码关键特性..."
 echo ""
 
 # 检查源代码中是否有历史导航的关键特性
-if grep -q "使用上下箭头键导航命令历史" client.c; then
+if grep -q "使用上下箭头键导航命令历史" src/client.c; then
     echo "   ✓ 客户端包含历史导航提示"
 else
     echo "   ✗ 客户端缺少历史导航提示"
     MISSING=$((MISSING + 1))
 fi
 
-if grep -q "支持上下箭头键导航命令历史" server.c; then
+if grep -q "支持上下箭头键导航命令历史" src/server.c; then
     echo "   ✓ 服务器包含历史导航提示"
 else
     echo "   ✗ 服务器缺少历史导航提示"
     MISSING=$((MISSING + 1))
 fi
 
-if grep -q "CommandHistory" common.h; then
+if grep -q "CommandHistory" include/common.h; then
     echo "   ✓ common.h定义了CommandHistory结构"
 else
     echo "   ✗ common.h缺少CommandHistory结构"
     MISSING=$((MISSING + 1))
 fi
 
-if grep -q "MAX_HISTORY_SIZE" common.h; then
+if grep -q "MAX_HISTORY_SIZE" include/common.h; then
     echo "   ✓ common.h定义了MAX_HISTORY_SIZE常量"
 else
     echo "   ✗ common.h缺少MAX_HISTORY_SIZE常量"
@@ -98,25 +98,25 @@ echo ""
 echo "4. 检查历史管理实现..."
 echo ""
 
-if [ -f history.c ]; then
+if [ -f src/history.c ]; then
     echo "   ✓ history.c文件存在"
     
     # 检查关键实现
-    if grep -q "循环缓冲区" history.c || grep -q "循环队列" history.c; then
+    if grep -q "循环缓冲区" src/history.c || grep -q "循环队列" src/history.c; then
         echo "   ✓ 使用循环缓冲区存储"
     else
         echo "   ✗ 未找到循环缓冲区实现"
         MISSING=$((MISSING + 1))
     fi
     
-    if grep -q "转义序列" history.c; then
+    if grep -q "转义序列" src/history.c; then
         echo "   ✓ 实现了转义序列检测（箭头键）"
     else
         echo "   ✗ 未找到转义序列处理"
         MISSING=$((MISSING + 1))
     fi
     
-    if grep -q "refresh_line" history.c; then
+    if grep -q "refresh_line" src/history.c; then
         echo "   ✓ 实现了行刷新功能"
     else
         echo "   ✗ 未找到行刷新功能"
@@ -142,8 +142,8 @@ if [ $MISSING -eq 0 ]; then
     echo "  - 客户端和服务器都支持历史导航"
     echo ""
     echo "使用方法："
-    echo "  1. 运行服务器: ./server 8888"
-    echo "  2. 运行客户端: ./client 127.0.0.1 8888"
+    echo "  1. 运行服务器: ./build/server 8888"
+    echo "  2. 运行客户端: ./build/client 127.0.0.1 8888"
     echo "  3. 输入一些命令"
     echo "  4. 按上箭头键查看历史命令"
     echo "  5. 按下箭头键前进到更新的命令"

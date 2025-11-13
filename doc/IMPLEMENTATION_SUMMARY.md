@@ -9,10 +9,10 @@
 ### 1. Modbus TCP 协议实现 ✅
 
 #### 文件结构
-- `modbus.h` - Modbus TCP 协议定义和接口
-- `modbus.c` - Modbus TCP 协议实现
-- `server.c` - 服务端增强（支持 Modbus）
-- `client.c` - 客户端增强（支持 Modbus）
+- `include/modbus.h` - Modbus TCP 协议定义和接口
+- `src/modbus.c` - Modbus TCP 协议实现
+- `src/server.c` - 服务端增强（支持 Modbus）
+- `src/client.c` - 客户端增强（支持 Modbus）
 - `Makefile` - 已更新编译配置
 
 #### 协议支持
@@ -141,7 +141,7 @@
 
 #### 功能测试
 ```bash
-./test_modbus_interactive.sh
+./tests/test_modbus_interactive.sh
 ```
 
 **测试结果：**
@@ -189,7 +189,7 @@ make
 
 ### 连接服务器
 ```bash
-./client 127.0.0.1 502
+./build/client 127.0.0.1 502
 ```
 
 ### 可用命令
@@ -282,9 +282,9 @@ make
 
 ## 文档
 
-- `README.md` - 主文档，包含Modbus快速入门
-- `MODBUS_README.md` - Modbus TCP 详细文档
-- `IMPLEMENTATION_SUMMARY.md` - 本文档，实现总结
+- `doc/README.md` - 主文档，包含Modbus快速入门
+- `doc/MODBUS_README.md` - Modbus TCP 详细文档
+- `doc/IMPLEMENTATION_SUMMARY.md` - 本文档，实现总结
 - 代码内注释 - 所有函数和结构体都有详细注释
 
 ## 总结
