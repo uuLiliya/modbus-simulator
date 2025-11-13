@@ -11,15 +11,15 @@ TARGETS = server client
 # 默认目标：编译所有程序（服务器和客户端）
 all: $(TARGETS)
 
-# 编译服务器程序：依赖server.c、modbus.c、common.h和modbus.h文件
-# 使用gcc编译器，按照CFLAGS标志，将server.c和modbus.c编译成名为server的可执行文件
-server: server.c modbus.c common.h modbus.h
-	$(CC) $(CFLAGS) -o server server.c modbus.c
+# 编译服务器程序：依赖server.c、modbus.c、history.c、common.h和modbus.h文件
+# 使用gcc编译器，按照CFLAGS标志，将server.c、modbus.c和history.c编译成名为server的可执行文件
+server: server.c modbus.c history.c common.h modbus.h
+	$(CC) $(CFLAGS) -o server server.c modbus.c history.c
 
-# 编译客户端程序：依赖client.c、modbus.c、common.h和modbus.h文件
-# 使用gcc编译器，按照CFLAGS标志，将client.c和modbus.c编译成名为client的可执行文件
-client: client.c modbus.c common.h modbus.h
-	$(CC) $(CFLAGS) -o client client.c modbus.c
+# 编译客户端程序：依赖client.c、modbus.c、history.c、common.h和modbus.h文件
+# 使用gcc编译器，按照CFLAGS标志，将client.c、modbus.c和history.c编译成名为client的可执行文件
+client: client.c modbus.c history.c common.h modbus.h
+	$(CC) $(CFLAGS) -o client client.c modbus.c history.c
 
 # 清理目标：删除所有编译生成的文件
 # 强制删除所有目标可执行文件（server和client）和目标文件（.o文件）
