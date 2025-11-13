@@ -4,12 +4,14 @@
  * 功能描述：
  * - 连接指定的服务器地址和端口
  * - 从命令行读取用户输入并发送给服务器
- * - 接收并打印服务器返回的回显消息
+ * - 实时接收并显示服务器发送的消息（包括回显和服务器主动发送的消息）
+ * - 使用select()同时监听标准输入和套接字
  * - 支持 "quit" 命令和信号中断时的优雅退出
  */
 
 #include "common.h"
 #include <signal.h>
+#include <sys/select.h>
 #include <stdbool.h>
 
 /* 客户端套接字文件描述符（用于全局清理） */
@@ -20,7 +22,7 @@ static int socket_fd = -1;
  * 参数：
  *   signum - 信号编号（未使用，仅用于兼容信号处理器）
  */
-void cleanup(int signum __attribute__((unused))) {
+static void cleanup(int signum __attribute__((unused))) {
     printf("\n[客户端] 正在断开连接...\n");
     if (socket_fd != -1) {
         close(socket_fd);
@@ -83,44 +85,80 @@ int main(int argc, char *argv[]) {
     printf("[客户端] 连接成功！\n");
     printf("[客户端] 输入消息发送给服务器（输入 'quit' 退出）：\n\n");
 
-    char buffer[BUFFER_SIZE];   /* 用户输入缓冲区 */
-    char response[BUFFER_SIZE]; /* 服务器响应缓冲区 */
+    char buffer[BUFFER_SIZE];
+    char response[BUFFER_SIZE];
+    fd_set read_fds;
+    int max_fd = socket_fd > STDIN_FILENO ? socket_fd : STDIN_FILENO;
+    bool should_prompt = true;
 
-    /* 主交互循环：读取用户输入，发送并接收回显 */
+    /* 主交互循环：使用 select 同时监听标准输入和套接字 */
     while (1) {
-        printf("[你] ");
-        fflush(stdout);
+        /* 需要提示时显示提示符 */
+        if (should_prompt) {
+            printf("[你] ");
+            fflush(stdout);
+            should_prompt = false;
+        }
 
-        /* 从标准输入读取一行数据 */
-        if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
+        /* 设置文件描述符集合 */
+        FD_ZERO(&read_fds);
+        FD_SET(STDIN_FILENO, &read_fds);
+        FD_SET(socket_fd, &read_fds);
+
+        /* 等待可读事件（无超时，阻塞等待） */
+        int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+        if (activity < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            perror("select");
             break;
         }
 
-        /* 判断是否输入退出命令 */
-        if (strcmp(buffer, "quit\n") == 0 || strcmp(buffer, "quit") == 0) {
-            printf("[客户端] 正在断开连接...\n");
-            break;
+        /* 检查套接字是否可读（收到服务器消息） */
+        if (FD_ISSET(socket_fd, &read_fds)) {
+            memset(response, 0, BUFFER_SIZE);
+            ssize_t n_read = read(socket_fd, response, BUFFER_SIZE - 1);
+            
+            if (n_read < 0) {
+                perror("read");
+                break;
+            } else if (n_read == 0) {
+                printf("\n[客户端] 服务器已关闭连接。\n");
+                break;
+            } else {
+                response[n_read] = '\0';
+                printf("\n[服务器消息] %s", response);
+                if (response[n_read - 1] != '\n') {
+                    printf("\n");
+                }
+                fflush(stdout);
+                should_prompt = true;
+            }
         }
 
-        /* 将输入数据发送给服务器 */
-        ssize_t n_write = write(socket_fd, buffer, strlen(buffer));
-        if (n_write < 0) {
-            perror("write");
-            break;
-        }
+        /* 检查标准输入是否可读（用户输入） */
+        if (FD_ISSET(STDIN_FILENO, &read_fds)) {
+            memset(buffer, 0, BUFFER_SIZE);
+            if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
+                break;
+            }
 
-        /* 清空响应缓冲区并等待服务器回显消息 */
-        memset(response, 0, BUFFER_SIZE);
-        ssize_t n_read = read(socket_fd, response, BUFFER_SIZE - 1);
-        if (n_read < 0) {
-            perror("read");
-            break;
-        } else if (n_read == 0) {
-            printf("[客户端] 服务器已关闭连接。\n");
-            break;
-        } else {
-            response[n_read] = '\0';
-            printf("[服务器] %s\n", response);
+            /* 检查是否为退出命令 */
+            if (strcmp(buffer, "quit\n") == 0 || strcmp(buffer, "quit") == 0) {
+                printf("[客户端] 正在断开连接...\n");
+                break;
+            }
+
+            /* 发送消息到服务器 */
+            ssize_t n_write = write(socket_fd, buffer, strlen(buffer));
+            if (n_write < 0) {
+                perror("write");
+                break;
+            }
+
+            /* 设置标志以显示提示符 */
+            should_prompt = true;
         }
     }
 

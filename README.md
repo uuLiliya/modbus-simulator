@@ -5,9 +5,12 @@ A high-performance multi-client TCP server and client implementation in C for Ub
 ## Features
 
 - **Multi-Client Server**: Supports up to 128 concurrent client connections
+- **Client Identification**: Each client receives a unique ID (Client_1, Client_2, etc.)
+- **Server-Initiated Messaging**: Server can send messages to specific clients or broadcast to all
 - **Epoll-Based Multiplexing**: Efficient event-driven I/O using Linux epoll for high throughput
 - **Non-blocking Sockets**: Optimized for handling multiple clients with minimal overhead
-- **Interactive Client**: Full-duplex communication with echo server responses
+- **Interactive Client**: Full-duplex communication with real-time message receiving
+- **Server Commands**: Interactive server commands for client management and messaging
 - **Graceful Shutdown**: Proper signal handling and resource cleanup
 - **Clear Error Handling**: Informative error messages and logging
 
@@ -47,9 +50,10 @@ Example:
 ./server 8888
 ```
 
-The server will display:
+The server will display messages similar to:
 ```
-[Server] Listening on port 8888 (Max clients: 128)
+[服务器] 正在监听端口 8888（最大客户端数: 128）
+[服务器] 输入 'help' 查看可用命令
 ```
 
 ### Connect a client:
@@ -89,17 +93,51 @@ Terminal 4 - Add more clients as needed:
 ./client 127.0.0.1 8888
 ```
 
-### Interactive client commands:
+### Server Commands:
 
-Once connected, type messages to send to the server:
+Once the server is running, you can use these interactive commands:
+
+- **`list`** - Display all connected clients with their IDs and addresses
+- **`send <client_id> <message>`** - Send a message to a specific client (e.g., `send Client_1 Hello`)
+- **`broadcast <message>`** - Send a message to all connected clients
+- **`help`** - Display help information for available commands
+
+Example server session:
+```
+[服务器] 正在监听端口 8888（最大客户端数: 128）
+[服务器] 输入 'help' 查看可用命令
+
+list
+[服务器] 当前连接的客户端列表：
+  - Client_1 (fd=5, 地址=127.0.0.1:54321)
+  - Client_2 (fd=6, 地址=127.0.0.1:54322)
+[服务器] 总计：2 个客户端
+
+send Client_1 你好客户端1！
+[服务器] 已向 Client_1 发送消息: 你好客户端1！
+
+broadcast 服务器公告：系统将在5分钟后重启
+[服务器] 已广播消息给 2 个客户端
+```
+
+### Interactive Client Usage:
+
+Once connected, type messages to send to the server. The client can receive messages at any time:
 
 ```
-[You] Hello Server
-[Server] Echo: Hello Server
-[You] This is a test message
-[Server] Echo: This is a test message
-[You] quit
-[Client] Disconnecting...
+[客户端] 正在连接 127.0.0.1:8888...
+[客户端] 连接成功！
+[客户端] 输入消息发送给服务器（输入 'quit' 退出）：
+
+[服务器消息] [服务器通知] 欢迎，您的编号为 Client_1。
+
+[你] 你好服务器
+[服务器消息] [服务器回显][Client_1] 你好服务器
+
+[服务器消息] [服务器] 你好客户端1！
+
+[你] quit
+[客户端] 正在断开连接...
 ```
 
 Type `quit` to disconnect from the server.
@@ -108,6 +146,7 @@ Type `quit` to disconnect from the server.
 
 ### Common Header (`common.h`)
 - Shared constants and includes
+- `ClientInfo` structure storing file descriptor, unique ID, address, and active state
 - MAX_CLIENTS: 128 concurrent connections
 - BUFFER_SIZE: 4096 bytes per message
 - LISTEN_BACKLOG: 128 pending connections
@@ -115,20 +154,24 @@ Type `quit` to disconnect from the server.
 ### Server (`server.c`)
 - **Epoll-based event loop**: Efficiently handles all client connections
 - **Non-blocking I/O**: Prevents blocking on any single client
-- **Dynamic client management**: Accepts and removes clients on-demand
-- **Echo protocol**: Echoes received messages back to clients
-- **Connection logging**: Displays all connection/disconnection events
+- **Unique client identification**: Assigns `Client_X` style IDs and logs per-client activity
+- **Server-side messaging**: Interactive commands for targeted messages and broadcasts
+- **Echo protocol**: Echoes received messages back to sending clients
+- **Robust logging**: Tracks connections, disconnections, and message origins
+- **Graceful fallback**: Continues to operate even when stdin command mode is unavailable
 
 Key functions:
 - `set_nonblocking()`: Converts socket to non-blocking mode
-- `cleanup()`: Signal handler for graceful shutdown
+- `handle_stdin_input()`: Parses and executes server console commands
+- `disconnect_client()`: Cleans up epoll state and closes client connections
 - `main()`: Event loop and client handling
 
 ### Client (`client.c`)
 - **Standard socket connection**: Connects to specified server and port
-- **Interactive CLI**: Read-write loop for sending/receiving messages
-- **Input validation**: Checks IP addresses and port numbers
+- **Select-based multiplexing**: Simultaneously monitors stdin and socket for real-time updates
+- **Interactive CLI**: Sends user input and displays server messages with clear prefixes
 - **Graceful disconnection**: Handles server closure and user quit command
+- **Responsive UI**: Automatically reprints prompts after incoming server messages
 
 ## Performance Characteristics
 
