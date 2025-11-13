@@ -188,6 +188,12 @@ Solution: Increase system file descriptor limit with `ulimit -n`.
 - **Signal handling**: Graceful shutdown on SIGINT/SIGTERM
 - **Standard compliance**: POSIX-compliant C99 code
 
+## Related Documentation
+
+For Git command reference and version control workflows, see:
+
+- **[Git Command Guide](docs/GIT_GUIDE.md)** - Comprehensive Git commands reference including basic setup, branching, merging, and common workflows
+
 ## File Structure
 
 ```
@@ -196,7 +202,9 @@ Solution: Increase system file descriptor limit with `ulimit -n`.
 ├── server.c       # Multi-client TCP server implementation
 ├── client.c       # TCP client implementation
 ├── Makefile       # Build configuration
-└── README.md      # This file
+├── README.md      # This file
+└── docs/
+    └── GIT_GUIDE.md # Git commands and workflows reference
 ```
 
 ## License
