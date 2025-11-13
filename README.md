@@ -1,11 +1,12 @@
-# Multi-Client TCP Server and Client
+# Multi-Client TCP Server and Client with Modbus TCP Support
 
-A high-performance multi-client TCP server and client implementation in C for Ubuntu/Linux systems.
+A high-performance multi-client TCP server and client implementation in C for Ubuntu/Linux systems, featuring full Modbus TCP protocol support.
 
 ## Features
 
+### Core Features
 - **Multi-Client Server**: Supports up to 128 concurrent client connections
-- **Client Identification**: Each client receives a unique ID (Client_1, Client_2, etc.)
+- **Client Identification**: Each client identified by socket file descriptor
 - **Server-Initiated Messaging**: Server can send messages to specific clients or broadcast to all
 - **Epoll-Based Multiplexing**: Efficient event-driven I/O using Linux epoll for high throughput
 - **Non-blocking Sockets**: Optimized for handling multiple clients with minimal overhead
@@ -13,6 +14,15 @@ A high-performance multi-client TCP server and client implementation in C for Ub
 - **Server Commands**: Interactive server commands for client management and messaging
 - **Graceful Shutdown**: Proper signal handling and resource cleanup
 - **Clear Error Handling**: Informative error messages and logging
+
+### Modbus TCP Features
+- **FC03 Support**: Read Holding Registers (up to 125 registers per request)
+- **FC06 Support**: Write Single Register
+- **Standard Compliant**: Fully compliant with Modbus TCP specification
+- **Error Handling**: Complete exception response mechanism
+- **Mixed Protocol**: Supports both Modbus and plain text communication on same connection
+- **1000 Registers**: Pre-configured with 1000 holding registers and 1000 input registers
+- **Real-time Display**: Shows register values and changes in both server and client
 
 ## Requirements
 
@@ -231,23 +241,51 @@ Solution: Increase system file descriptor limit with `ulimit -n`.
 - **Signal handling**: Graceful shutdown on SIGINT/SIGTERM
 - **Standard compliance**: POSIX-compliant C99 code
 
+## Modbus TCP Quick Start
+
+### Basic Usage
+
+Start server:
+```bash
+./server 502    # Standard Modbus TCP port
+```
+
+Connect client and send Modbus commands:
+```bash
+./client 127.0.0.1 502
+modbus read 100 5        # Read 5 registers starting from address 100
+modbus write 100 9999    # Write value 9999 to register at address 100
+quit
+```
+
+### Run Tests
+
+```bash
+./test_modbus_interactive.sh
+```
+
+For detailed Modbus TCP documentation, see **[MODBUS_README.md](MODBUS_README.md)**.
+
 ## Related Documentation
 
-For Git command reference and version control workflows, see:
-
+- **[Modbus TCP Documentation](MODBUS_README.md)** - Complete Modbus TCP protocol implementation guide
 - **[Git Command Guide](docs/GIT_GUIDE.md)** - Comprehensive Git commands reference including basic setup, branching, merging, and common workflows
 
 ## File Structure
 
 ```
 .
-├── common.h       # Shared constants and includes
-├── server.c       # Multi-client TCP server implementation
-├── client.c       # TCP client implementation
-├── Makefile       # Build configuration
-├── README.md      # This file
+├── common.h                     # Shared constants and includes
+├── modbus.h                     # Modbus protocol definitions
+├── modbus.c                     # Modbus protocol implementation
+├── server.c                     # Multi-client TCP server with Modbus support
+├── client.c                     # TCP client with Modbus command support
+├── Makefile                     # Build configuration
+├── README.md                    # This file
+├── MODBUS_README.md             # Modbus TCP detailed documentation
+├── test_modbus_interactive.sh   # Modbus functionality test script
 └── docs/
-    └── GIT_GUIDE.md # Git commands and workflows reference
+    └── GIT_GUIDE.md             # Git commands and workflows reference
 ```
 
 ## License

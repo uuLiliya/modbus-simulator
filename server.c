@@ -7,11 +7,13 @@
  * - 每个客户端使用 socket 文件描述符作为唯一标识
  * - 服务器可向指定客户端发送消息或广播消息
  * - 实现回显（Echo）协议，将客户端发来的消息前添加 "Echo: " 前缀后返回
+ * - 支持 Modbus TCP 协议，作为 Modbus 服务器处理 FC03 和 FC06 请求
  * - 使用非阻塞套接字和事件驱动模型提高吞吐量
  * - 支持优雅关闭和信号处理
  */
 
 #include "common.h"
+#include "modbus.h"
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -22,6 +24,9 @@
 /* epoll 每次可以处理的最大事件数 */
 #define MAX_EVENTS 128
 
+/* Modbus 寄存器数量（简化实现，使用1000个寄存器） */
+#define MODBUS_REGISTER_COUNT 1000
+
 /* 全局变量：服务器套接字和 epoll 文件描述符 */
 static int server_fd = -1;
 static int epoll_fd = -1;
@@ -29,6 +34,10 @@ static int epoll_fd = -1;
 /* 全局变量：客户端信息数组和客户端计数器 */
 static ClientInfo clients[MAX_CLIENTS];
 static int client_count = 0;
+
+/* 全局变量：Modbus 寄存器数组 */
+static uint16_t holding_registers[MODBUS_REGISTER_COUNT];  /* 保持寄存器 */
+static uint16_t input_registers[MODBUS_REGISTER_COUNT];    /* 输入寄存器 */
 
 /*
  * 初始化客户端信息数组
@@ -39,6 +48,212 @@ static void init_clients() {
         clients[i].active = false;
         memset(clients[i].id, 0, CLIENT_ID_LENGTH);
     }
+}
+
+/*
+ * 初始化 Modbus 寄存器数组
+ * 为保持寄存器和输入寄存器设置初始值
+ */
+static void init_modbus_registers() {
+    /* 初始化保持寄存器（可读写）为递增值 */
+    for (int i = 0; i < MODBUS_REGISTER_COUNT; i++) {
+        holding_registers[i] = i;
+    }
+    
+    /* 初始化输入寄存器（只读）为固定值 */
+    for (int i = 0; i < MODBUS_REGISTER_COUNT; i++) {
+        input_registers[i] = 1000 + i;
+    }
+    
+    printf("[服务器] Modbus 寄存器已初始化（保持寄存器: %d 个，输入寄存器: %d 个）\n",
+           MODBUS_REGISTER_COUNT, MODBUS_REGISTER_COUNT);
+}
+
+/*
+ * 检查数据是否为 Modbus TCP 消息
+ * 通过检查 MBAP Header 的协议标识符判断
+ */
+static bool is_modbus_message(const uint8_t *buffer, size_t length) {
+    if (length < MODBUS_MBAP_HEADER_LENGTH) {
+        return false;
+    }
+    
+    /* 检查协议标识符（字节2-3）是否为0x0000 */
+    uint16_t protocol_id = (uint16_t)(buffer[2] << 8) | buffer[3];
+    return (protocol_id == MODBUS_PROTOCOL_ID);
+}
+
+/*
+ * 处理 Modbus TCP 请求
+ * 
+ * 参数：
+ *   client - 客户端信息
+ *   request_buffer - 请求数据缓冲区
+ *   request_length - 请求数据长度
+ * 
+ * 返回：
+ *   成功返回 true，失败返回 false
+ */
+static bool handle_modbus_request(ClientInfo *client, const uint8_t *request_buffer, size_t request_length) {
+    if (!client || !request_buffer) {
+        return false;
+    }
+    
+    /* 解析 Modbus 请求 */
+    ModbusTCPMessage request;
+    if (!modbus_parse_request(request_buffer, request_length, &request)) {
+        printf("[服务器] [fd:%d] Modbus 请求解析失败\n", client->fd);
+        return false;
+    }
+    
+    printf("[服务器] [fd:%d] Modbus 请求：事务ID=%u, 功能码=0x%02X, 单元ID=%u\n",
+           client->fd, request.mbap.transaction_id, request.pdu.function_code, request.mbap.unit_id);
+    
+    uint8_t response_buffer[MODBUS_MAX_MESSAGE_LENGTH];
+    size_t response_length = 0;
+    
+    /* 根据功能码处理请求 */
+    switch (request.pdu.function_code) {
+        case MODBUS_FC_READ_HOLDING_REGISTERS: {
+            /* FC03：读保持寄存器 */
+            if (request.pdu.data_length < 4) {
+                printf("[服务器] [fd:%d] FC03 请求数据不足\n", client->fd);
+                response_length = modbus_build_error_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    MODBUS_FC_READ_HOLDING_REGISTERS,
+                    MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+                break;
+            }
+            
+            /* 解析起始地址和数量 */
+            uint16_t start_address = (uint16_t)(request.pdu.data[0] << 8) | request.pdu.data[1];
+            uint16_t quantity = (uint16_t)(request.pdu.data[2] << 8) | request.pdu.data[3];
+            
+            printf("[服务器] [fd:%d] FC03 读保持寄存器：起始地址=%u, 数量=%u\n",
+                   client->fd, start_address, quantity);
+            
+            /* 验证地址范围 */
+            if (quantity == 0 || quantity > MODBUS_MAX_READ_REGISTERS ||
+                start_address >= MODBUS_REGISTER_COUNT ||
+                (start_address + quantity) > MODBUS_REGISTER_COUNT) {
+                printf("[服务器] [fd:%d] FC03 地址越界\n", client->fd);
+                response_length = modbus_build_error_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    MODBUS_FC_READ_HOLDING_REGISTERS,
+                    MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+            } else {
+                /* 读取寄存器并构建响应 */
+                response_length = modbus_build_fc03_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    &holding_registers[start_address],
+                    quantity,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+                
+                /* 显示读取的寄存器值 */
+                printf("[服务器] [fd:%d] FC03 响应：", client->fd);
+                for (uint16_t i = 0; i < (quantity < 5 ? quantity : 5); i++) {
+                    printf("[%u]=%u ", start_address + i, holding_registers[start_address + i]);
+                }
+                if (quantity > 5) {
+                    printf("...(共%u个)", quantity);
+                }
+                printf("\n");
+            }
+            break;
+        }
+        
+        case MODBUS_FC_WRITE_SINGLE_REGISTER: {
+            /* FC06：写单个寄存器 */
+            if (request.pdu.data_length < 4) {
+                printf("[服务器] [fd:%d] FC06 请求数据不足\n", client->fd);
+                response_length = modbus_build_error_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    MODBUS_FC_WRITE_SINGLE_REGISTER,
+                    MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+                break;
+            }
+            
+            /* 解析寄存器地址和值 */
+            uint16_t register_address = (uint16_t)(request.pdu.data[0] << 8) | request.pdu.data[1];
+            uint16_t register_value = (uint16_t)(request.pdu.data[2] << 8) | request.pdu.data[3];
+            
+            printf("[服务器] [fd:%d] FC06 写单个寄存器：地址=%u, 旧值=%u, 新值=%u\n",
+                   client->fd, register_address,
+                   register_address < MODBUS_REGISTER_COUNT ? holding_registers[register_address] : 0,
+                   register_value);
+            
+            /* 验证地址范围 */
+            if (register_address >= MODBUS_REGISTER_COUNT) {
+                printf("[服务器] [fd:%d] FC06 地址越界\n", client->fd);
+                response_length = modbus_build_error_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    MODBUS_FC_WRITE_SINGLE_REGISTER,
+                    MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+            } else {
+                /* 写入寄存器 */
+                holding_registers[register_address] = register_value;
+                
+                /* 构建响应（回显请求） */
+                response_length = modbus_build_fc06_response(
+                    request.mbap.transaction_id,
+                    request.mbap.unit_id,
+                    register_address,
+                    register_value,
+                    response_buffer,
+                    sizeof(response_buffer)
+                );
+                
+                printf("[服务器] [fd:%d] FC06 写入成功：[%u]=%u\n",
+                       client->fd, register_address, register_value);
+            }
+            break;
+        }
+        
+        default:
+            /* 不支持的功能码 */
+            printf("[服务器] [fd:%d] 不支持的功能码：0x%02X\n", client->fd, request.pdu.function_code);
+            response_length = modbus_build_error_response(
+                request.mbap.transaction_id,
+                request.mbap.unit_id,
+                request.pdu.function_code,
+                MODBUS_EXCEPTION_ILLEGAL_FUNCTION,
+                response_buffer,
+                sizeof(response_buffer)
+            );
+            break;
+    }
+    
+    /* 发送响应 */
+    if (response_length > 0) {
+        ssize_t n_write = write(client->fd, response_buffer, response_length);
+        if (n_write < 0) {
+            perror("write");
+            return false;
+        }
+        printf("[服务器] [fd:%d] Modbus 响应已发送（%zu 字节）\n", client->fd, response_length);
+        return true;
+    }
+    
+    return false;
 }
 
 /*
@@ -355,6 +570,9 @@ int main(int argc, char *argv[]) {
     /* 初始化客户端信息数组 */
     init_clients();
 
+    /* 初始化 Modbus 寄存器 */
+    init_modbus_registers();
+
     /* 注册信号处理器，用于优雅关闭 */
     signal(SIGINT, cleanup);
     signal(SIGTERM, cleanup);
@@ -537,7 +755,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                char buffer[BUFFER_SIZE];
+                uint8_t buffer[BUFFER_SIZE];
                 ssize_t n_read = read(client_fd, buffer, BUFFER_SIZE - 1);
 
                 if (n_read < 0) {
@@ -554,29 +772,36 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                buffer[n_read] = '\0';
+                /* 检查是否为 Modbus TCP 消息 */
+                if (is_modbus_message(buffer, n_read)) {
+                    /* 处理 Modbus 请求 */
+                    handle_modbus_request(client, buffer, n_read);
+                } else {
+                    /* 处理普通文本消息（回显协议） */
+                    buffer[n_read] = '\0';
 
-                char message[BUFFER_SIZE];
-                strncpy(message, buffer, BUFFER_SIZE - 1);
-                message[BUFFER_SIZE - 1] = '\0';
-                trim_newline(message);
+                    char message[BUFFER_SIZE];
+                    strncpy(message, (char*)buffer, BUFFER_SIZE - 1);
+                    message[BUFFER_SIZE - 1] = '\0';
+                    trim_newline(message);
 
-                const char *log_message = strlen(message) > 0 ? message : "(空消息)";
-                printf("[服务器] [fd:%d] 消息：%s\n", client->fd, log_message);
+                    const char *log_message = strlen(message) > 0 ? message : "(空消息)";
+                    printf("[服务器] [fd:%d] 消息：%s\n", client->fd, log_message);
 
-                char response[BUFFER_SIZE];
-                int resp_len = snprintf(response, BUFFER_SIZE, "[服务器回显][fd:%d] %s\n", client->fd, message);
-                if (resp_len < 0) {
-                    continue;
-                }
-                if (resp_len >= BUFFER_SIZE) {
-                    response[BUFFER_SIZE - 1] = '\0';
-                }
+                    char response[BUFFER_SIZE];
+                    int resp_len = snprintf(response, BUFFER_SIZE, "[服务器回显][fd:%d] %s\n", client->fd, message);
+                    if (resp_len < 0) {
+                        continue;
+                    }
+                    if (resp_len >= BUFFER_SIZE) {
+                        response[BUFFER_SIZE - 1] = '\0';
+                    }
 
-                ssize_t n_write = write(client_fd, response, strlen(response));
-                if (n_write < 0) {
-                    perror("write");
-                    disconnect_client(client, "发送失败");
+                    ssize_t n_write = write(client_fd, response, strlen(response));
+                    if (n_write < 0) {
+                        perror("write");
+                        disconnect_client(client, "发送失败");
+                    }
                 }
             }
         }
