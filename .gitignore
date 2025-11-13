@@ -1,0 +1,29 @@
+# Compiled binaries
+server
+client
+*.o
+*.a
+*.so
+
+# Build artifacts
+*.out
+*.exe
+*.elf
+
+# Debug files
+*.dSYM/
+*.su
+*.gch
+*.pch
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# System files
+.env
+.env.local
