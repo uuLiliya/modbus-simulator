@@ -39,6 +39,12 @@ static int client_count = 0;
 static uint16_t holding_registers[MODBUS_REGISTER_COUNT];  /* 保持寄存器 */
 static uint16_t input_registers[MODBUS_REGISTER_COUNT];    /* 输入寄存器 */
 
+/* 命令历史记录 */
+static CommandHistory cmd_history;
+
+/* 服务器输入状态 */
+static ServerInputState server_input_state;
+
 /*
  * 初始化客户端信息数组
  */
@@ -444,18 +450,25 @@ static void trim_newline(char *str) {
  */
 static void handle_stdin_input() {
     char input[BUFFER_SIZE];
-    if (fgets(input, BUFFER_SIZE, stdin) == NULL) {
+    int result = process_server_input_char(&server_input_state, "[服务器] ", &cmd_history, input, BUFFER_SIZE);
+    
+    if (result < 0) {
+        /* 错误或Ctrl+D */
         return;
     }
-
-    size_t len = strlen(input);
-    if (len > 0 && input[len - 1] == '\n') {
-        input[len - 1] = '\0';
+    
+    if (result == 0) {
+        /* 继续输入中 */
+        return;
     }
-
+    
+    /* result == 1，完成一行输入 */
     if (strlen(input) == 0) {
         return;
     }
+    
+    /* 添加到历史记录 */
+    add_to_history(&cmd_history, input);
 
     if (strcmp(input, "list") == 0) {
         list_clients();
@@ -534,6 +547,10 @@ static void handle_stdin_input() {
  */
 static void cleanup(int signum __attribute__((unused))) {
     printf("\n[服务器] 正在关闭...\n");
+    
+    /* 清理输入状态 */
+    cleanup_server_input(&server_input_state);
+    
     if (epoll_fd != -1) {
         close(epoll_fd);
     }
@@ -572,6 +589,9 @@ int main(int argc, char *argv[]) {
 
     /* 初始化 Modbus 寄存器 */
     init_modbus_registers();
+    
+    /* 初始化命令历史记录 */
+    init_history(&cmd_history);
 
     /* 注册信号处理器，用于优雅关闭 */
     signal(SIGINT, cleanup);
@@ -642,11 +662,14 @@ int main(int argc, char *argv[]) {
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, STDIN_FILENO, &event) < 0) {
         fprintf(stderr, "[服务器] 警告：无法监听标准输入，命令功能不可用（原因: %s）。\n", strerror(errno));
         stdin_registered = false;
+    } else {
+        /* 初始化服务器输入状态（启用历史导航） */
+        init_server_input(&server_input_state);
     }
 
     printf("[服务器] 正在监听端口 %d（最大客户端数: %d）\n", port, MAX_CLIENTS);
     if (stdin_registered) {
-        printf("[服务器] 输入 'help' 查看可用命令\n\n");
+        printf("[服务器] 输入 'help' 查看可用命令（支持上下箭头键导航命令历史）\n\n");
     } else {
         printf("[服务器] 命令行控制不可用，将仅提供基础通信功能。\n\n");
     }

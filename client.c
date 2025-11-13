@@ -22,6 +22,9 @@ static int socket_fd = -1;
 /* 全局事务ID计数器（用于 Modbus 请求） */
 static uint16_t transaction_id = 1;
 
+/* 命令历史记录 */
+static CommandHistory cmd_history;
+
 /*
  * 清理函数：关闭 socket 并退出进程
  * 参数：
@@ -309,40 +312,23 @@ int main(int argc, char *argv[]) {
     printf("  modbus read <起始地址> <数量>   - 读取保持寄存器 (FC03)\n");
     printf("  modbus write <地址> <值>        - 写单个寄存器 (FC06)\n");
     printf("  quit                             - 退出程序\n");
-    printf("  或输入任意文本消息发送给服务器\n\n");
+    printf("  或输入任意文本消息发送给服务器\n");
+    printf("  使用上下箭头键导航命令历史\n\n");
+
+    /* 初始化命令历史 */
+    init_history(&cmd_history);
 
     char buffer[BUFFER_SIZE];
     uint8_t response[BUFFER_SIZE];
-    fd_set read_fds;
-    int max_fd = socket_fd > STDIN_FILENO ? socket_fd : STDIN_FILENO;
-    bool should_prompt = true;
 
-    /* 主交互循环：使用 select 同时监听标准输入和套接字 */
+    /* 主交互循环：使用历史导航功能读取用户输入 */
     while (1) {
-        /* 需要提示时显示提示符 */
-        if (should_prompt) {
-            printf("[你] ");
-            fflush(stdout);
-            should_prompt = false;
-        }
-
-        /* 设置文件描述符集合 */
-        FD_ZERO(&read_fds);
-        FD_SET(STDIN_FILENO, &read_fds);
-        FD_SET(socket_fd, &read_fds);
-
-        /* 等待可读事件（无超时，阻塞等待） */
-        int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
-        if (activity < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            perror("select");
-            break;
-        }
-
-        /* 检查套接字是否可读（收到服务器消息） */
-        if (FD_ISSET(socket_fd, &read_fds)) {
+        /* 读取一行输入，支持历史导航和实时接收服务器消息 */
+        memset(buffer, 0, BUFFER_SIZE);
+        int result = read_line_with_history(buffer, BUFFER_SIZE, "[你] ", &cmd_history, socket_fd);
+        
+        if (result == -2) {
+            /* socket有数据，需要先处理服务器消息 */
             memset(response, 0, BUFFER_SIZE);
             ssize_t n_read = read(socket_fd, response, BUFFER_SIZE - 1);
             
@@ -366,25 +352,26 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 fflush(stdout);
-                should_prompt = true;
             }
+            continue;  /* 继续等待用户输入 */
+        } else if (result < 0) {
+            /* 读取失败或用户按Ctrl+C/Ctrl+D */
+            printf("\n[客户端] 正在断开连接...\n");
+            break;
+        } else if (result == 0) {
+            /* 空行，继续 */
+            continue;
         }
-
-        /* 检查标准输入是否可读（用户输入） */
-        if (FD_ISSET(STDIN_FILENO, &read_fds)) {
-            memset(buffer, 0, BUFFER_SIZE);
-            if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
-                break;
-            }
-
-            /* 处理用户命令 */
-            if (!handle_user_command(buffer)) {
-                printf("[客户端] 正在断开连接...\n");
-                break;
-            }
-
-            /* 设置标志以显示提示符 */
-            should_prompt = true;
+        
+        /* 添加到历史记录（非空命令） */
+        if (buffer[0] != '\0') {
+            add_to_history(&cmd_history, buffer);
+        }
+        
+        /* 处理用户命令 */
+        if (!handle_user_command(buffer)) {
+            printf("[客户端] 正在断开连接...\n");
+            break;
         }
     }
 

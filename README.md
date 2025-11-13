@@ -12,6 +12,7 @@ A high-performance multi-client TCP server and client implementation in C for Ub
 - **Non-blocking Sockets**: Optimized for handling multiple clients with minimal overhead
 - **Interactive Client**: Full-duplex communication with real-time message receiving
 - **Server Commands**: Interactive server commands for client management and messaging
+- **Command History Navigation**: Use arrow keys to browse command history (up to 100 commands)
 - **Graceful Shutdown**: Proper signal handling and resource cleanup
 - **Clear Error Handling**: Informative error messages and logging
 
@@ -63,8 +64,10 @@ Example:
 The server will display messages similar to:
 ```
 [服务器] 正在监听端口 8888（最大客户端数: 128）
-[服务器] 输入 'help' 查看可用命令
+[服务器] 输入 'help' 查看可用命令（支持上下箭头键导航命令历史）
 ```
+
+**Note**: The server supports command history navigation with arrow keys - press UP to view previous commands, DOWN to move forward in history.
 
 ### Connect a client:
 ```bash
@@ -132,23 +135,35 @@ broadcast 服务器公告：系统将在5分钟后重启
 
 ### Interactive Client Usage:
 
-Once connected, type messages to send to the server. The client can receive messages at any time:
+Once connected, type messages to send to the server. The client can receive messages at any time and supports command history navigation:
 
 ```
 [客户端] 正在连接 127.0.0.1:8888...
 [客户端] 连接成功！
-[客户端] 输入消息发送给服务器（输入 'quit' 退出）：
+[客户端] 可用命令：
+  modbus read <起始地址> <数量>   - 读取保持寄存器 (FC03)
+  modbus write <地址> <值>        - 写单个寄存器 (FC06)
+  quit                             - 退出程序
+  或输入任意文本消息发送给服务器
+  使用上下箭头键导航命令历史
 
-[服务器消息] [服务器通知] 欢迎，您的编号为 Client_1。
+[服务器消息] [服务器通知] 欢迎，您的文件描述符为 5。
 
 [你] 你好服务器
-[服务器消息] [服务器回显][Client_1] 你好服务器
+[服务器消息] [服务器回显][fd:5] 你好服务器
 
-[服务器消息] [服务器] 你好客户端1！
+[服务器消息] [服务器] 你好客户端！
 
 [你] quit
 [客户端] 正在断开连接...
 ```
+
+**Command History Features**:
+- Press **UP arrow** to browse previous commands
+- Press **DOWN arrow** to move forward in history
+- Press **LEFT/RIGHT arrows** to move cursor within the line
+- Press **Backspace** to edit commands
+- Commands can be edited after recalling from history
 
 Type `quit` to disconnect from the server.
 
@@ -269,6 +284,7 @@ For detailed Modbus TCP documentation, see **[MODBUS_README.md](MODBUS_README.md
 ## Related Documentation
 
 - **[Modbus TCP Documentation](MODBUS_README.md)** - Complete Modbus TCP protocol implementation guide
+- **[Command History Documentation](HISTORY_README.md)** - Detailed guide for command history navigation features
 - **[Git Command Guide](docs/GIT_GUIDE.md)** - Comprehensive Git commands reference including basic setup, branching, merging, and common workflows
 
 ## File Structure
@@ -278,12 +294,17 @@ For detailed Modbus TCP documentation, see **[MODBUS_README.md](MODBUS_README.md
 ├── common.h                     # Shared constants and includes
 ├── modbus.h                     # Modbus protocol definitions
 ├── modbus.c                     # Modbus protocol implementation
+├── history.c                    # Command history management implementation
 ├── server.c                     # Multi-client TCP server with Modbus support
 ├── client.c                     # TCP client with Modbus command support
 ├── Makefile                     # Build configuration
 ├── README.md                    # This file
 ├── MODBUS_README.md             # Modbus TCP detailed documentation
+├── HISTORY_README.md            # Command history navigation documentation
 ├── test_modbus_interactive.sh   # Modbus functionality test script
+├── test_history.sh              # Command history manual test guide
+├── test_history_auto.sh         # Command history automated test
+├── verify_compilation.sh        # Verify history feature compilation
 └── docs/
     └── GIT_GUIDE.md             # Git commands and workflows reference
 ```
