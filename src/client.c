@@ -42,6 +42,7 @@ static CommandHistory cmd_history;
  */
 static void cleanup(int signum __attribute__((unused))) {
     printf("\n[客户端] 正在断开连接...\n");
+    cleanup_history(&cmd_history);
     if (socket_fd != -1) {
         close(socket_fd);
     }
@@ -390,6 +391,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* 释放资源并退出 */
+    cleanup_history(&cmd_history);
     close(socket_fd);
     socket_fd = -1;
     return 0;
