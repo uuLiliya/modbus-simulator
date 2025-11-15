@@ -1,7 +1,9 @@
 # 定义C语言编译器为gcc
 CC = gcc
 # 定义编译标志：开启所有警告、额外警告、使用C99标准、开启优化，添加头文件搜索路径
-CFLAGS = -Wall -Wextra -std=c99 -O2 -Iinclude
+# DEBUG_MODE 编译选项：1=调试模式（默认），0=纯数据流模式
+DEBUG_MODE ?= 1
+CFLAGS = -Wall -Wextra -std=c99 -O2 -Iinclude -DDEBUG_MODE=$(DEBUG_MODE)
 # 定义源文件目录
 SRC_DIR = src
 # 定义头文件目录
@@ -43,6 +45,10 @@ help:
 	@echo "  clean    - Remove all built files"
 	@echo "  help     - Show this help message"
 	@echo ""
+	@echo "Build options:"
+	@echo "  DEBUG_MODE=1 (default) - Build in debug mode with all debug info"
+	@echo "  DEBUG_MODE=0           - Build in pure data mode (compatible with standard Modbus tools)"
+	@echo ""
 	@echo "Project structure:"
 	@echo "  src/       - Source code files (.c)"
 	@echo "  include/   - Header files (.h)"
@@ -51,6 +57,8 @@ help:
 	@echo "  tests/     - Test scripts"
 	@echo ""
 	@echo "Usage:"
+	@echo "  Debug mode (default):   make"
+	@echo "  Pure data mode:         make DEBUG_MODE=0"
 	@echo "  Start server: ./build/server <port>"
 	@echo "  Start client: ./build/client <server_ip> <server_port>"
 	@echo "  Example: ./build/server 8888 &"

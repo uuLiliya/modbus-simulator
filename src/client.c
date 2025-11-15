@@ -8,6 +8,10 @@
  * - 支持 Modbus TCP 协议，可以发送 FC03 读寄存器和 FC06 写寄存器请求
  * - 使用select()同时监听标准输入和套接字
  * - 支持 "quit" 命令和信号中断时的优雅退出
+ * 
+ * 编译模式（通过 DEBUG_MODE 宏控制）：
+ * - DEBUG_MODE=1（默认）：调试模式，显示所有调试消息
+ * - DEBUG_MODE=0：纯数据流模式，仅接收 Modbus 数据，无调试输出
  */
 
 #include "common.h"
@@ -15,6 +19,11 @@
 #include <signal.h>
 #include <sys/select.h>
 #include <stdbool.h>
+
+/* 如果未定义 DEBUG_MODE，默认为 1（调试模式） */
+#ifndef DEBUG_MODE
+#define DEBUG_MODE 1
+#endif
 
 /* 客户端套接字文件描述符（用于全局清理） */
 static int socket_fd = -1;
@@ -307,6 +316,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+#if DEBUG_MODE
     printf("[客户端] 连接成功！\n");
     printf("[客户端] 可用命令：\n");
     printf("  modbus read <起始地址> <数量>   - 读取保持寄存器 (FC03)\n");
@@ -314,6 +324,9 @@ int main(int argc, char *argv[]) {
     printf("  quit                             - 退出程序\n");
     printf("  或输入任意文本消息发送给服务器\n");
     printf("  使用上下箭头键导航命令历史\n\n");
+#else
+    printf("[客户端] 已连接到服务器 %s:%d\n\n", server_ip, server_port);
+#endif
 
     /* 初始化命令历史 */
     init_history(&cmd_history);

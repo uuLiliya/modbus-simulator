@@ -10,6 +10,10 @@
  * - 支持 Modbus TCP 协议，作为 Modbus 服务器处理 FC03 和 FC06 请求
  * - 使用非阻塞套接字和事件驱动模型提高吞吐量
  * - 支持优雅关闭和信号处理
+ * 
+ * 编译模式（通过 DEBUG_MODE 宏控制）：
+ * - DEBUG_MODE=1（默认）：调试模式，保留所有日志和欢迎消息
+ * - DEBUG_MODE=0：纯数据流模式，仅 Modbus TCP 数据，无调试输出
  */
 
 #include "common.h"
@@ -20,6 +24,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <limits.h>
+
+/* 如果未定义 DEBUG_MODE，默认为 1（调试模式） */
+#ifndef DEBUG_MODE
+#define DEBUG_MODE 1
+#endif
 
 /* epoll 每次可以处理的最大事件数 */
 #define MAX_EVENTS 128
@@ -352,8 +361,9 @@ static void disconnect_client(ClientInfo *client, const char *reason) {
 }
 
 /*
- * 列出所有连接的客户端
+ * 列出所有连接的客户端（仅在调试模式下使用）
  */
+#if DEBUG_MODE
 static void list_clients() {
     printf("[服务器] 当前连接的客户端列表：\n");
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -366,15 +376,17 @@ static void list_clients() {
     }
     printf("[服务器] 总计：%d 个客户端\n", client_count);
 }
+#endif /* DEBUG_MODE */
 
 /*
- * 向指定客户端发送消息
+ * 向指定客户端发送消息（仅在调试模式下使用）
  * 参数：
  *   target_fd - 客户端的 socket 文件描述符
  *   message - 要发送的消息
  * 返回：
  *   成功返回true，失败返回false
  */
+#if DEBUG_MODE
 static bool send_to_client(int target_fd, const char *message) {
     ClientInfo *client = find_client_by_fd(target_fd);
     if (!client) {
@@ -395,12 +407,14 @@ static bool send_to_client(int target_fd, const char *message) {
     }
     return true;
 }
+#endif /* DEBUG_MODE */
 
 /*
- * 向所有客户端广播消息
+ * 向所有客户端广播消息（仅在调试模式下使用）
  * 参数：
  *   message - 要广播的消息
  */
+#if DEBUG_MODE
 static void broadcast_message(const char *message) {
     int sent_count = 0;
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -413,6 +427,7 @@ static void broadcast_message(const char *message) {
     }
     printf("[服务器] 已广播消息给 %d 个客户端\n", sent_count);
 }
+#endif /* DEBUG_MODE */
 
 /*
  * 将文件描述符设置为非阻塞模式
@@ -448,6 +463,7 @@ static void trim_newline(char *str) {
  *   broadcast <message> - 向所有客户端广播消息
  *   help - 显示帮助信息
  */
+#if DEBUG_MODE
 static void handle_stdin_input() {
     char input[BUFFER_SIZE];
     int result = process_server_input_char(&server_input_state, "[服务器] ", &cmd_history, input, BUFFER_SIZE);
@@ -539,12 +555,13 @@ static void handle_stdin_input() {
         printf("[服务器] 未知命令: %s (输入 'help' 查看可用命令)\n", input);
     }
 }
+#endif /* DEBUG_MODE */
 
-/*
- * 清理函数：在接收到退出信号时关闭所有资源
- * 参数：
- *   signum - 信号编号（未使用但为了兼容信号处理器函数签名）
- */
+    /*
+    * 清理函数：在接收到退出信号时关闭所有资源
+    * 参数：
+    *   signum - 信号编号（未使用但为了兼容信号处理器函数签名）
+    */
 static void cleanup(int signum __attribute__((unused))) {
     printf("\n[服务器] 正在关闭...\n");
     
@@ -655,16 +672,18 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    /* 将标准输入添加到 epoll 监听列表（用于服务器命令输入） */
+    /* 将标准输入添加到 epoll 监听列表（用于服务器命令输入，仅在调试模式下） */
+#if DEBUG_MODE
+    bool stdin_registered = false;
     event.events = EPOLLIN;
     event.data.fd = STDIN_FILENO;
-    bool stdin_registered = true;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, STDIN_FILENO, &event) < 0) {
         fprintf(stderr, "[服务器] 警告：无法监听标准输入，命令功能不可用（原因: %s）。\n", strerror(errno));
         stdin_registered = false;
     } else {
         /* 初始化服务器输入状态（启用历史导航） */
         init_server_input(&server_input_state);
+        stdin_registered = true;
     }
 
     printf("[服务器] 正在监听端口 %d（最大客户端数: %d）\n", port, MAX_CLIENTS);
@@ -673,6 +692,10 @@ int main(int argc, char *argv[]) {
     } else {
         printf("[服务器] 命令行控制不可用，将仅提供基础通信功能。\n\n");
     }
+#else
+    printf("[服务器] 正在监听端口 %d（最大客户端数: %d）[纯数据流模式]\n", port, MAX_CLIENTS);
+    printf("[服务器] 纯数据流模式运行中...\n\n");
+#endif
 
     /* 事件数组 */
     struct epoll_event events[MAX_EVENTS];
@@ -692,10 +715,16 @@ int main(int argc, char *argv[]) {
 
         /* 处理所有就绪的事件 */
         for (int i = 0; i < n; i++) {
-            /* 情况一：标准输入有数据，处理服务器命令 */
+            /* 情况一：标准输入有数据，处理服务器命令（仅在调试模式下） */
+#if DEBUG_MODE
             if (events[i].data.fd == STDIN_FILENO) {
                 handle_stdin_input();
             }
+#else
+            if (events[i].data.fd == STDIN_FILENO) {
+                continue;  /* 纯数据流模式下忽略标准输入 */
+            }
+#endif
             /* 情况二：服务器套接字有可读事件，表示有新连接到来 */
             else if (events[i].data.fd == server_fd) {
                 /* 循环接受所有待处理的连接（非阻塞模式可能积累多个连接） */
@@ -754,13 +783,15 @@ int main(int argc, char *argv[]) {
                            ntohs(client_addr.sin_port),
                            client_count);
 
-                    /* 发送欢迎消息 */
+                    /* 发送欢迎消息（仅在调试模式下） */
+#if DEBUG_MODE
                     char welcome[BUFFER_SIZE];
                     snprintf(welcome, BUFFER_SIZE, "[服务器通知] 欢迎，您的文件描述符为 %d。\n", client->fd);
                     if (write(client_fd, welcome, strlen(welcome)) < 0) {
                         perror("write");
                         disconnect_client(client, "发送欢迎消息失败");
                     }
+#endif
                 }
             }
             /* 情况三：客户端套接字有数据或者发生断开 */
@@ -800,7 +831,7 @@ int main(int argc, char *argv[]) {
                     /* 处理 Modbus 请求 */
                     handle_modbus_request(client, buffer, n_read);
                 } else {
-                    /* 处理普通文本消息（回显协议） */
+                    /* 处理普通文本消息（回显协议，仅在调试模式下） */
                     buffer[n_read] = '\0';
 
                     char message[BUFFER_SIZE];
@@ -808,6 +839,7 @@ int main(int argc, char *argv[]) {
                     message[BUFFER_SIZE - 1] = '\0';
                     trim_newline(message);
 
+#if DEBUG_MODE
                     const char *log_message = strlen(message) > 0 ? message : "(空消息)";
                     printf("[服务器] [fd:%d] 消息：%s\n", client->fd, log_message);
 
@@ -825,6 +857,7 @@ int main(int argc, char *argv[]) {
                         perror("write");
                         disconnect_client(client, "发送失败");
                     }
+#endif
                 }
             }
         }
