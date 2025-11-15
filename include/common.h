@@ -2,7 +2,7 @@
 #define COMMON_H
 
 /*
- * 公共头文件：集中声明服务器和客户端共享的常量以及网络通信所需的标准库。
+ * 公共头文件：集中声明服务器和客户端共享的常量、数据结构以及网络通信所需的标准库。
  */
 
 /* 标准库与系统头文件，提供输入输出、内存管理、套接字以及网络协议支持。 */
@@ -48,38 +48,35 @@ typedef struct {
     bool navigating;                /* 是否正在浏览历史记录 */
 } CommandHistory;
 
-/* 终端控制相关函数 */
-void enable_raw_mode(struct termios *original);
-void disable_raw_mode(struct termios *original);
+/* 输入状态机状态 */
+typedef enum {
+    INPUT_STATE_NORMAL = 0,      /* 正常字符输入 */
+    INPUT_STATE_ESCAPE,          /* 收到ESC (0x1B) */
+    INPUT_STATE_BRACKET,         /* 收到ESC[ */
+    INPUT_STATE_BRACKET_PARAM    /* 收到ESC[N（N为参数） */
+} InputState;
 
-/* 命令历史管理函数 */
-void init_history(CommandHistory *history);
-void add_to_history(CommandHistory *history, const char *command);
-const char* get_previous_command(CommandHistory *history);
-const char* get_next_command(CommandHistory *history);
-void reset_history_navigation(CommandHistory *history);
-
-/* 交互式输入函数 */
-int read_line_with_history(char *buffer, int buffer_size, const char *prompt, 
-                           CommandHistory *history, int socket_fd);
-
-/* 服务器非阻塞输入状态 */
+/* 行输入状态（服务器非阻塞输入使用） */
 typedef struct {
-    char buffer[MAX_COMMAND_LENGTH];   /* 输入缓冲区 */
-    int pos;                           /* 光标位置 */
-    int len;                           /* 当前输入长度 */
-    char temp_buffer[MAX_COMMAND_LENGTH]; /* 临时保存用户正在输入的内容 */
-    bool has_temp;                     /* 是否有临时保存的内容 */
-    int escape_state;                  /* 转义序列状态：0=正常, 1=收到ESC, 2=收到ESC[ */
-    struct termios original_termios;   /* 原始终端设置 */
-    bool raw_mode_enabled;             /* 是否已启用raw mode */
-    bool prompt_shown;                 /* 是否已显示提示符 */
-} ServerInputState;
+    char buffer[MAX_COMMAND_LENGTH];       /* 输入缓冲区 */
+    int pos;                               /* 光标位置 */
+    int len;                               /* 当前输入长度 */
+    char temp_buffer[MAX_COMMAND_LENGTH];  /* 保存未提交的输入行 */
+    bool has_temp;                         /* 是否有临时保存的内容 */
 
-/* 服务器非阻塞输入函数 */
-void init_server_input(ServerInputState *state);
-void cleanup_server_input(ServerInputState *state);
-int process_server_input_char(ServerInputState *state, const char *prompt, 
-                              CommandHistory *history, char *output, int output_size);
+    /* 有限状态机 */
+    InputState state;                      /* 当前状态 */
+    char escape_seq[8];                    /* 转义序列缓冲区 */
+    int escape_pos;                        /* 转义序列位置 */
+
+    /* 终端控制 */
+    struct termios original_termios;       /* 原始终端设置 */
+    bool raw_mode_enabled;                 /* 是否已启用raw mode */
+    bool prompt_shown;                     /* 是否已显示提示符 */
+
+    /* 窗口大小信息 */
+    int term_width;                        /* 终端宽度 */
+    int term_height;                       /* 终端高度 */
+} InputLineState;
 
 #endif

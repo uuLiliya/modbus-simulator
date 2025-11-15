@@ -15,6 +15,7 @@
  */
 
 #include "common.h"
+#include "history.h"
 #include "modbus.h"
 #include <signal.h>
 #include <sys/select.h>
