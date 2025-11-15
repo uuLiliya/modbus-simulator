@@ -559,16 +559,19 @@ static void handle_stdin_input() {
 #endif /* DEBUG_MODE */
 
     /*
-    * 清理函数：在接收到退出信号时关闭所有资源
-    * 参数：
-    *   signum - 信号编号（未使用但为了兼容信号处理器函数签名）
-    */
-static void cleanup(int signum __attribute__((unused))) {
+     * 清理函数：在接收到退出信号时关闭所有资源
+     * 参数：
+     *   signum - 信号编号（未使用但为了兼容信号处理器函数签名）
+     */
+    static void cleanup(int signum __attribute__((unused))) {
     printf("\n[服务器] 正在关闭...\n");
-    
+
+    /* 清理命令历史 */
+    cleanup_history(&cmd_history);
+
     /* 清理输入状态 */
     cleanup_server_input(&server_input_state);
-    
+
     if (epoll_fd != -1) {
         close(epoll_fd);
     }
@@ -576,7 +579,7 @@ static void cleanup(int signum __attribute__((unused))) {
         close(server_fd);
     }
     exit(0);
-}
+    }
 
 /*
  * 主函数：初始化并运行 TCP 服务器
