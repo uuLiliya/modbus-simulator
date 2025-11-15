@@ -29,12 +29,11 @@ static void write_uint16_be(uint8_t *buffer, uint16_t value) {
 
 /*
  * 解析 MBAP Header
- * 
- * MBAP Header 格式（7字节）：
- * 字节0-1：Transaction ID（事务标识符，大端序）
- * 字节2-3：Protocol ID（协议标识符，大端序，固定0x0000）
- * 字节4-5：Length（长度，大端序，表示后续字节数）
- * 字节6：Unit ID（单元标识符）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节)
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x06   | 0x01
+ *
+ * 验证协议标识符与长度字段，确保消息结构合法。
  */
 static bool parse_mbap_header(const uint8_t *buffer, size_t length, ModbusMBAPHeader *header) {
     /* 检查长度是否足够 */
@@ -115,12 +114,11 @@ bool modbus_parse_request(const uint8_t *buffer, size_t length, ModbusTCPMessage
 
 /*
  * 构建 FC03 读保持寄存器响应
- * 
- * 响应格式：
- * MBAP Header（7字节）
- * 功能码 0x03（1字节）
- * 字节计数（1字节）= 寄存器数量 * 2
- * 寄存器值（N*2字节，每个寄存器2字节，大端序）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节) | 功能码(1字节) | 字节计数(1字节) | 寄存器数据...
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x09   | 0x01           | 0x03        | 0x06         | ...
+ *
+ * 字节计数等于寄存器数量 * 2，寄存器数据按大端序排列。
  */
 size_t modbus_build_fc03_response(uint16_t transaction_id, uint8_t unit_id,
                                   const uint16_t *registers, uint16_t quantity,
@@ -157,12 +155,11 @@ size_t modbus_build_fc03_response(uint16_t transaction_id, uint8_t unit_id,
 
 /*
  * 构建 FC03 读保持寄存器请求
- * 
- * 请求格式：
- * MBAP Header（7字节）
- * 功能码 0x03（1字节）
- * 起始地址（2字节，大端序）
- * 寄存器数量（2字节，大端序）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节) | 功能码(1字节) | 起始地址高字节 | 起始地址低字节 | 寄存器数量高字节 | 寄存器数量低字节
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x06   | 0x01           | 0x03        | 0x00          | 0x6B          | 0x00             | 0x03
+ *
+ * 起始地址与寄存器数量均采用大端序编码。
  */
 size_t modbus_build_fc03_request(uint16_t transaction_id, uint8_t unit_id,
                                  uint16_t start_address, uint16_t quantity,
@@ -236,12 +233,11 @@ uint16_t modbus_parse_fc03_response(const ModbusTCPMessage *message,
 
 /*
  * 构建 FC06 写单个寄存器响应
- * 
- * 响应格式（与请求相同）：
- * MBAP Header（7字节）
- * 功能码 0x06（1字节）
- * 寄存器地址（2字节，大端序）
- * 寄存器值（2字节，大端序）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节) | 功能码(1字节) | 寄存器地址高字节 | 寄存器地址低字节 | 寄存器值高字节 | 寄存器值低字节
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x06   | 0x01           | 0x06        | 0x00            | 0x01            | 0x00          | 0x03
+ *
+ * 服务器回显写入的地址和值以确认操作成功。
  */
 size_t modbus_build_fc06_response(uint16_t transaction_id, uint8_t unit_id,
                                   uint16_t register_address, uint16_t register_value,
@@ -273,12 +269,11 @@ size_t modbus_build_fc06_response(uint16_t transaction_id, uint8_t unit_id,
 
 /*
  * 构建 FC06 写单个寄存器请求
- * 
- * 请求格式：
- * MBAP Header（7字节）
- * 功能码 0x06（1字节）
- * 寄存器地址（2字节，大端序）
- * 寄存器值（2字节，大端序）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节) | 功能码(1字节) | 寄存器地址高字节 | 寄存器地址低字节 | 寄存器值高字节 | 寄存器值低字节
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x06   | 0x01           | 0x06        | 0x00            | 0x01            | 0x00          | 0x03
+ *
+ * 请求格式与响应完全一致，使用大端序编码。
  */
 size_t modbus_build_fc06_request(uint16_t transaction_id, uint8_t unit_id,
                                  uint16_t register_address, uint16_t register_value,
@@ -293,11 +288,11 @@ size_t modbus_build_fc06_request(uint16_t transaction_id, uint8_t unit_id,
 
 /*
  * 构建 Modbus 错误响应
- * 
- * 错误响应格式：
- * MBAP Header（7字节）
- * 功能码 | 0x80（1字节）
- * 异常码（1字节）
+ *
+ * // 事务标识符(2字节) | 协议标识符(2字节) | 长度(2字节) | 单元标识符(1字节) | 错误功能码(1字节) | 异常码(1字节)
+ * // 0x00 0x01        | 0x00 0x00        | 0x00 0x03   | 0x01           | 0x83            | 0x02
+ *
+ * 错误功能码为原始功能码 | 0x80，异常码指示具体错误原因。
  */
 size_t modbus_build_error_response(uint16_t transaction_id, uint8_t unit_id,
                                    uint8_t function_code, uint8_t exception_code,
