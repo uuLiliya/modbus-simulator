@@ -17,6 +17,7 @@
  */
 
 #include "common.h"
+#include "history.h"
 #include "modbus.h"
 #include <sys/epoll.h>
 #include <fcntl.h>

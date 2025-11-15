@@ -19,14 +19,14 @@ TARGETS = $(BUILD_DIR)/server $(BUILD_DIR)/client
 # 默认目标：编译所有程序（服务器和客户端）
 all: $(TARGETS)
 
-# 编译服务器程序：依赖server.c、modbus.c、history.c、common.h和modbus.h文件
+# 编译服务器程序：依赖server.c、modbus.c、history.c、common.h、modbus.h和history.h文件
 # 使用gcc编译器，按照CFLAGS标志，将server.c、modbus.c和history.c编译成名为server的可执行文件
-$(BUILD_DIR)/server: $(SRC_DIR)/server.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c $(INCLUDE_DIR)/common.h $(INCLUDE_DIR)/modbus.h | $(BUILD_DIR)
+$(BUILD_DIR)/server: $(SRC_DIR)/server.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c $(INCLUDE_DIR)/common.h $(INCLUDE_DIR)/modbus.h $(INCLUDE_DIR)/history.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $(BUILD_DIR)/server $(SRC_DIR)/server.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c
 
-# 编译客户端程序：依赖client.c、modbus.c、history.c、common.h和modbus.h文件
+# 编译客户端程序：依赖client.c、modbus.c、history.c、common.h、modbus.h和history.h文件
 # 使用gcc编译器，按照CFLAGS标志，将client.c、modbus.c和history.c编译成名为client的可执行文件
-$(BUILD_DIR)/client: $(SRC_DIR)/client.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c $(INCLUDE_DIR)/common.h $(INCLUDE_DIR)/modbus.h | $(BUILD_DIR)
+$(BUILD_DIR)/client: $(SRC_DIR)/client.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c $(INCLUDE_DIR)/common.h $(INCLUDE_DIR)/modbus.h $(INCLUDE_DIR)/history.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $(BUILD_DIR)/client $(SRC_DIR)/client.c $(SRC_DIR)/modbus.c $(SRC_DIR)/history.c
 
 # 创建build目录（如果不存在）
